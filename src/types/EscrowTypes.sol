@@ -19,10 +19,9 @@ contract EscrowTypes {
     }
 
     enum MilestoneStatus {
-        Pending,
         Funded,
         Submitted,
-        Approved,
+        Paid,
         Disputed
     }
 
