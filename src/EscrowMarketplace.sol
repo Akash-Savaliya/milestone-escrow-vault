@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { console } from "forge-std/console.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IEscrowMarketplace } from "./interfaces/IEscrowMarketplace.sol";
 import { EscrowTypes } from "./types/EscrowTypes.sol";
 
 abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
-    uint256 private s_nextJobId = 0;
+    uint256 internal s_nextJobId = 0;
 
     mapping(uint256 => EscrowTypes.Job) public s_jobs;
     mapping(uint256 => EscrowTypes.MileStone[]) public s_jobMilestones;
@@ -84,10 +85,10 @@ abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
                 status: EscrowTypes.MilestoneStatus.Funded
             })
         );
+        emit MilestoneCreated(newMilestoneId);
+
         s_jobs[jobId].fundedAmount += amount;
         emit JobFunded(jobId, newMilestoneId, amount);
-
-        emit MilestoneCreated(newMilestoneId);
     }
 
     function submitMilestone(uint256 jobId, uint256 milestoneId) external override onlyFreelancer(jobId) {
@@ -131,9 +132,9 @@ abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
         milestone.status = EscrowTypes.MilestoneStatus.Paid;
         address freelancer = s_jobs[jobId].freelancer;
         uint256 payoutAmount = milestone.amount;
-        emit MilestonePaid(milestoneId);
         (bool success,) = payable(freelancer).call{ value: payoutAmount }("");
         if (!success) revert EscrowTypes.Escrow__TransferFailed();
+        emit MilestonePaid(milestoneId);
     }
 
     function raiseDispute(uint256 jobId, uint256 milestoneId) external override {
@@ -143,7 +144,7 @@ abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
 
         EscrowTypes.Job storage job = s_jobs[jobId];
 
-        if (!(job.client == msg.sender || job.freelancer == msg.sender)) {
+        if (job.client != msg.sender && job.freelancer != msg.sender) {
             revert EscrowTypes.Escrow__Unauthorized();
         }
 
@@ -177,7 +178,11 @@ abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
         emit DisputeRaised(jobId, msg.sender);
     }
 
-    function resolveDispute(uint256 jobId, address winner, uint256 milestoneId) external override nonReentrant {
+    function resolveDispute(uint256 jobId, address winner, uint256 milestoneId, uint256 disputeId)
+        external
+        override
+        nonReentrant
+    {
         if (winner == address(0)) revert EscrowTypes.Escrow__InvalidAddress();
 
         if (milestoneId >= s_jobMilestones[jobId].length) {
@@ -204,14 +209,22 @@ abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
             revert EscrowTypes.Escrow__InvalidState();
         }
 
+        EscrowTypes.Dispute storage dispute = s_disputes[jobId][disputeId];
+        console.log("dispute.status", uint8(dispute.status));
+        if (dispute.status != EscrowTypes.DisputeStatus.Active) {
+            revert EscrowTypes.Escrow__InvalidState();
+        }
+
+        dispute.status = EscrowTypes.DisputeStatus.Resolved;
         milestone.status = EscrowTypes.MilestoneStatus.Paid;
         job.status = EscrowTypes.JobStatus.Completed;
         job.disputeStatus = EscrowTypes.DisputeStatus.Resolved;
 
         address winnerAddress = winner;
-        emit DisputeResolved(jobId, winner, milestoneId);
         (bool success,) = payable(winnerAddress).call{ value: milestone.amount }("");
 
         if (!success) revert EscrowTypes.Escrow__TransferFailed();
+
+        emit DisputeResolved(jobId, winner, milestoneId);
     }
 }

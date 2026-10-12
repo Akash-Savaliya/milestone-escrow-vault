@@ -34,7 +34,7 @@ interface IEscrowMarketplace {
 
     function raiseDispute(uint256 jobId, uint256 milestoneId) external;
 
-    function resolveDispute(uint256 jobId, address winner, uint256 milestoneId) external;
+    function resolveDispute(uint256 jobId, address winner, uint256 milestoneId, uint256 discputeId) external;
 
     function approveAndPayMilestone(uint256 jobId, uint256 milestoneId) external payable;
 }
