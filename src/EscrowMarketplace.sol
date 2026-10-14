@@ -6,7 +6,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { IEscrowMarketplace } from "./interfaces/IEscrowMarketplace.sol";
 import { EscrowTypes } from "./types/EscrowTypes.sol";
 
-abstract contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
+contract EscrowMarketplace is ReentrancyGuard, IEscrowMarketplace {
     uint256 internal s_nextJobId = 0;
 
     mapping(uint256 => EscrowTypes.Job) public s_jobs;
